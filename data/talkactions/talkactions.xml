@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <talkactions>
+	<!-- new commands -->
+	<talkaction words="/save" script="save.lua" />
+	<talkaction words="/ttp" separator=" " script="teleport_to_pos.lua" />
+
 	<!-- commands -->
 	<talkaction words="/ban" separator=" " script="ban.lua" />
 	<talkaction words="/ipban" separator=" " script="ipban.lua" />
@@ -36,6 +40,7 @@
 	<talkaction words="/raid" separator=" " script="force_raid.lua" />
 
 	<!-- player talkactions -->
+	<talkaction words="!cast" separator=" " script="cast.lua" />
 	<talkaction words="!buypremium" script="buyprem.lua" />
 	<talkaction words="!buyhouse" script="buyhouse.lua" />
 	<talkaction words="!sellhouse" separator=" " script="sellhouse.lua" />

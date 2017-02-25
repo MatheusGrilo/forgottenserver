@@ -23,7 +23,16 @@
 #include "tools.h"
 
 DepotChest::DepotChest(uint16_t type) :
-	Container(type), maxDepotItems(1500) {}
+	Container(type), maxDepotItems(1500), depotId(0) {}
+
+DepotChest::DepotChest(uint16_t _type, bool _pagination) :
+	Container(_type)
+	 {
+	maxDepotItems = 2000;
+	maxSize = 32;
+	pagination = _pagination;
+	}
+
 
 ReturnValue DepotChest::queryAdd(int32_t index, const Thing& thing, uint32_t count,
 		uint32_t flags, Creature* actor/* = nullptr*/) const
@@ -52,6 +61,10 @@ ReturnValue DepotChest::queryAdd(int32_t index, const Thing& thing, uint32_t cou
 		if (getItemHoldingCount() + addCount > maxDepotItems) {
 			return RETURNVALUE_DEPOTISFULL;
 		}
+	}
+
+	if (actor != nullptr && getDepotId() == REWARD_CHEST_DEPOTID) {
+		return RETURNVALUE_NOTPOSSIBLE;
 	}
 
 	return Container::queryAdd(index, thing, count, flags, actor);

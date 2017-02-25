@@ -35,6 +35,8 @@
 #include "monster.h"
 #include "scheduler.h"
 #include "databasetasks.h"
+#include "scriptmanager.h"
+#include "store.h"
 
 extern Chat* g_chat;
 extern Game g_game;
@@ -42,6 +44,7 @@ extern Monsters g_monsters;
 extern ConfigManager g_config;
 extern Vocations g_vocations;
 extern Spells* g_spells;
+extern Store* g_store;
 
 ScriptEnvironment::DBResultMap ScriptEnvironment::tempResults;
 uint32_t ScriptEnvironment::lastResultId = 0;
@@ -1028,6 +1031,12 @@ void LuaScriptInterface::registerFunctions()
 	//registerEnumIn(tableName, value)
 
 	// Enums
+	registerEnum(STORE_ERROR_PURCHASE)
+	registerEnum(STORE_ERROR_NETWORK)
+	registerEnum(STORE_ERROR_HISTORY)
+	registerEnum(STORE_ERROR_TRANSFER)
+	registerEnum(STORE_ERROR_INFORMATION)
+
 	registerEnum(ACCOUNT_TYPE_NORMAL)
 	registerEnum(ACCOUNT_TYPE_TUTOR)
 	registerEnum(ACCOUNT_TYPE_SENIORTUTOR)
@@ -1333,6 +1342,7 @@ void LuaScriptInterface::registerFunctions()
 	registerEnum(CONST_SLOT_FEET)
 	registerEnum(CONST_SLOT_RING)
 	registerEnum(CONST_SLOT_AMMO)
+	registerEnum(CONST_SLOT_STORE_INBOX)
 
 	registerEnum(CREATURE_EVENT_NONE)
 	registerEnum(CREATURE_EVENT_LOGIN)
@@ -1435,6 +1445,7 @@ void LuaScriptInterface::registerFunctions()
 	registerEnum(ITEM_PLATINUM_COIN)
 	registerEnum(ITEM_CRYSTAL_COIN)
 	registerEnum(ITEM_AMULETOFLOSS)
+	registerEnum(ITEM_STORECOINS)
 	registerEnum(ITEM_PARCEL)
 	registerEnum(ITEM_LABEL)
 	registerEnum(ITEM_FIREFIELD_PVP_FULL)
@@ -1456,6 +1467,7 @@ void LuaScriptInterface::registerFunctions()
 	registerEnum(ITEM_WILDGROWTH)
 	registerEnum(ITEM_WILDGROWTH_PERSISTENT)
 	registerEnum(ITEM_WILDGROWTH_SAFE)
+	registerEnum(ITEM_STORE_INBOX)
 
 	registerEnum(PlayerFlag_CannotUseCombat)
 	registerEnum(PlayerFlag_CannotAttackPlayer)
@@ -1526,6 +1538,7 @@ void LuaScriptInterface::registerFunctions()
 	registerEnum(TALKTYPE_PRIVATE_TO)
 	registerEnum(TALKTYPE_CHANNEL_Y)
 	registerEnum(TALKTYPE_CHANNEL_O)
+	registerEnum(TALKTYPE_SPELL)
 	registerEnum(TALKTYPE_PRIVATE_NP)
 	registerEnum(TALKTYPE_PRIVATE_PN)
 	registerEnum(TALKTYPE_BROADCAST)
@@ -1743,6 +1756,9 @@ void LuaScriptInterface::registerFunctions()
 	registerEnum(RELOAD_TYPE_SPELLS)
 	registerEnum(RELOAD_TYPE_TALKACTIONS)
 	registerEnum(RELOAD_TYPE_WEAPONS)
+	registerEnum(RELOAD_TYPE_STORE)
+	
+	registerEnum(CHANNEL_CAST)
 
 	// _G
 	registerGlobalVariable("INDEX_WHEREEVER", INDEX_WHEREEVER);
@@ -2132,6 +2148,10 @@ void LuaScriptInterface::registerFunctions()
 	registerMetaMethod("Player", "__eq", LuaScriptInterface::luaUserdataCompare);
 
 	registerMethod("Player", "isPlayer", LuaScriptInterface::luaPlayerIsPlayer);
+	
+	registerMethod("Player", "isLiveCasting", LuaScriptInterface::luaPlayerIsLiveCasting);
+	registerMethod("Player", "startLiveCasting", LuaScriptInterface::luaPlayerStartLiveCasting);
+	registerMethod("Player", "stopLiveCasting", LuaScriptInterface::luaPlayerStopLiveCasting);
 
 	registerMethod("Player", "getGuid", LuaScriptInterface::luaPlayerGetGuid);
 	registerMethod("Player", "getIp", LuaScriptInterface::luaPlayerGetIp);
@@ -2283,6 +2303,8 @@ void LuaScriptInterface::registerFunctions()
 	registerMethod("Player", "getContainerId", LuaScriptInterface::luaPlayerGetContainerId);
 	registerMethod("Player", "getContainerById", LuaScriptInterface::luaPlayerGetContainerById);
 	registerMethod("Player", "getContainerIndex", LuaScriptInterface::luaPlayerGetContainerIndex);
+
+	registerMethod("Player", "sendStoreError", LuaScriptInterface::luaPlayerSendStoreError);
 
 	registerMethod("Player", "getInstantSpells", LuaScriptInterface::luaPlayerGetInstantSpells);
 	registerMethod("Player", "canCast", LuaScriptInterface::luaPlayerCanCast);
@@ -2566,6 +2588,10 @@ void LuaScriptInterface::registerFunctions()
 	registerMethod("MonsterType", "getChangeTargetChance", LuaScriptInterface::luaMonsterTypeGetChangeTargetChance);
 	registerMethod("MonsterType", "getChangeTargetSpeed", LuaScriptInterface::luaMonsterTypeGetChangeTargetSpeed);
 
+	// Reward
+	registerMethod("MonsterType", "useRewardChest", LuaScriptInterface::luaMonsterTypeUseRewardChest);
+	registerMethod("Item", "getNameDescription", LuaScriptInterface::luaItemGetNameDescription);
+
 	// Party
 	registerClass("Party", "", nullptr);
 	registerMetaMethod("Party", "__eq", LuaScriptInterface::luaUserdataCompare);
@@ -2591,6 +2617,13 @@ void LuaScriptInterface::registerFunctions()
 	registerMethod("Party", "isSharedExperienceEnabled", LuaScriptInterface::luaPartyIsSharedExperienceEnabled);
 	registerMethod("Party", "shareExperience", LuaScriptInterface::luaPartyShareExperience);
 	registerMethod("Party", "setSharedExperience", LuaScriptInterface::luaPartySetSharedExperience);
+
+	// StoreOffer
+	registerClass("StoreOffer", "", LuaScriptInterface::luaStoreOfferCreate);
+	registerMetaMethod("StoreOffer", "__eq", LuaScriptInterface::luaUserdataCompare);
+	
+	registerMethod("StoreOffer", "getId", LuaScriptInterface::luaStoreOfferGetId);
+	registerMethod("StoreOffer", "getName", LuaScriptInterface::luaStoreOfferGetName);
 
 	// Spells
 	registerClass("Spell", "", LuaScriptInterface::luaSpellCreate);
@@ -7383,6 +7416,43 @@ int LuaScriptInterface::luaPlayerIsPlayer(lua_State* L)
 	return 1;
 }
 
+int LuaScriptInterface::luaPlayerIsLiveCasting(lua_State* L)
+{
+	// player:isLiveCasting()
+	Player* player = getUserdata<Player>(L, 1);
+	pushBoolean(L, player->isLiveCasting());
+	return 1;
+}
+
+int LuaScriptInterface::luaPlayerStartLiveCasting(lua_State* L)
+{
+
+	Player* player = getUserdata<Player>(L, 1);
+	if (!player) {
+		lua_pushnil(L);
+		return 1;
+	
+	}
+	
+	std::string password;
+	if (lua_gettop(L) == 2) {
+		password = getString(L, 2);
+	
+	}
+	
+	lua_pushboolean(L, player->startLiveCasting(password));
+	return 1;
+}
+
+int LuaScriptInterface::luaPlayerStopLiveCasting(lua_State* L)
+{
+	// player:stopLiveCasting()
+	Player* player = getUserdata<Player>(L, 1);
+	player->stopLiveCasting();
+	pushBoolean(L, player->isLiveCasting() == false);
+	return 1;
+}
+
 int LuaScriptInterface::luaPlayerGetGuid(lua_State* L)
 {
 	// player:getGuid()
@@ -9343,6 +9413,25 @@ int LuaScriptInterface::luaPlayerGetFightMode(lua_State* L)
 	return 1;
 }
 
+int LuaScriptInterface::luaPlayerSendStoreError(lua_State* L) {
+		// player::sendStoreError(errorType, message)
+		Player* player = getUserdata<Player>(L, 1);
+	if (player) {
+		StoreError_t errorType = static_cast<StoreError_t>(getNumber<uint8_t>(L, 2));
+		if (isString(L, 3)) {
+			player->sendStoreError(errorType, getString(L, 3));
+			pushBoolean(L, true);
+			return 1;
+			
+		}
+		
+	}
+	
+		lua_pushnil(L);
+	return 1;
+	
+}
+
 // Monster
 int LuaScriptInterface::luaMonsterCreate(lua_State* L)
 {
@@ -11077,6 +11166,62 @@ int LuaScriptInterface::luaItemTypeHasSubType(lua_State* L)
 	return 1;
 }
 
+int LuaScriptInterface::luaItemGetNameDescription(lua_State* L)
+{
+	// item:getNameDescription()
+	const Item* item = getUserdata<const Item>(L, 1);
+
+	int32_t subType;
+	bool addArticle = true;
+	if (item) {
+		subType = item->getSubType();
+		const ItemType& it = Item::items[item->getID()];
+		std::ostringstream s;
+
+		const std::string& name = (item ? item->getName() : it.name);
+		if (!name.empty()) {
+			if (it.stackable && subType > 1) {
+				if (it.showCount) {
+					s << subType << ' ';
+				}
+
+				s << (item ? item->getPluralName() : it.getPluralName());
+			}
+			else {
+				if (addArticle) {
+					const std::string& article = (item ? item->getArticle() : it.article);
+					if (!article.empty()) {
+						s << article << ' ';
+					}
+				}
+
+				s << name;
+			}
+		}
+		else {
+			s << "an item of type " << it.id;
+		}
+		pushString(L, s.str());
+	}
+	else {
+		lua_pushnil(L);
+	}
+	return 1;
+}
+
+int LuaScriptInterface::luaMonsterTypeUseRewardChest(lua_State* L)
+{
+	// monsterType:useRewardChest()
+	MonsterType* monsterType = getUserdata<MonsterType>(L, 1);
+	if (monsterType) {
+		pushBoolean(L, monsterType->info.rewardChest);
+	}
+	else {
+		lua_pushnil(L);
+	}
+	return 1;
+}
+
 // Combat
 int LuaScriptInterface::luaCombatCreate(lua_State* L)
 {
@@ -11812,7 +11957,7 @@ int LuaScriptInterface::luaMonsterTypeGetLoot(lua_State* L)
 
 		int index = 0;
 		for (const auto& lootBlock : lootList) {
-			lua_createtable(L, 0, 7);
+			lua_createtable(L, 0, 8);
 
 			setField(L, "itemId", lootBlock.id);
 			setField(L, "chance", lootBlock.chance);
@@ -11820,6 +11965,9 @@ int LuaScriptInterface::luaMonsterTypeGetLoot(lua_State* L)
 			setField(L, "maxCount", lootBlock.countmax);
 			setField(L, "actionId", lootBlock.actionId);
 			setField(L, "text", lootBlock.text);
+
+			pushBoolean(L, lootBlock.uniquedrop);
+			lua_setfield(L, -2, "uniquedrop");
 
 			parseLoot(lootBlock.childLoot);
 			lua_setfield(L, -2, "childLoot");
@@ -12329,6 +12477,44 @@ int LuaScriptInterface::luaSpellIsLearnable(lua_State* L)
 	if (InstantSpell* spell = getUserdata<InstantSpell>(L, 1)) {
 		pushBoolean(L, spell->isLearnable());
 	} else {
+		lua_pushnil(L);
+	}
+	return 1;
+}
+
+int LuaScriptInterface::luaStoreOfferCreate(lua_State* L) {
+	// StoreOffer(id)
+	if (isNumber(L, 2)) {
+		auto offer = g_store->getOfferById(getNumber<uint32_t>(L, 2));
+		if (offer) {
+			pushUserdata<StoreOffer>(L, &(*offer));
+			setMetatable(L, -1, "StoreOffer");
+			return 1;
+		}
+	}
+
+	lua_pushnil(L);
+	return 1;
+}
+
+int LuaScriptInterface::luaStoreOfferGetId(lua_State* L) {
+	StoreOffer* offer = getUserdata<StoreOffer>(L, 1);
+	if (offer) {
+		lua_pushnumber(L, offer->id);
+	}
+	else {
+		lua_pushnil(L);
+	}
+	return 1;
+}
+
+int LuaScriptInterface::luaStoreOfferGetName(lua_State* L) {
+	// storeOffer:getName()
+	StoreOffer* offer = getUserdata<StoreOffer>(L, 1);
+	if (offer) {
+		pushString(L, offer->name);
+	}
+	else {
 		lua_pushnil(L);
 	}
 	return 1;

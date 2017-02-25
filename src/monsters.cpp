@@ -761,6 +761,9 @@ bool Monsters::loadMonster(const std::string& file, const std::string& monsterNa
 				mType->info.runAwayHealth = pugi::cast<int32_t>(attr.value());
 			} else if (strcasecmp(attrName, "hidehealth") == 0) {
 				mType->info.hiddenHealth = attr.as_bool();
+			}
+			else if (strcasecmp(attrName, "rewardchest") == 0) {
+				mType->info.rewardChest = attr.as_bool();
 			} else {
 				std::cout << "[Warning - Monsters::loadMonster] Unknown flag attribute: " << attrName << ". " << file << std::endl;
 			}
@@ -1158,6 +1161,10 @@ bool Monsters::loadLootItem(const pugi::xml_node& node, LootBlock& lootBlock)
 		if (charges != 0) {
 			lootBlock.subType = charges;
 		}
+	}
+
+	if ((attr = node.attribute("uniquedrop"))) {
+		lootBlock.uniquedrop = attr.as_bool();
 	}
 
 	if ((attr = node.attribute("actionId"))) {

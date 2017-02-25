@@ -26,7 +26,12 @@ function onStepIn(creature, item, position, fromPosition)
 		lookPosition:getNextPosition(creature:getDirection())
 		local depotItem = Tile(lookPosition):getItemByType(ITEM_TYPE_DEPOT)
 		if depotItem ~= nil then
-			local depotItems = creature:getDepotChest(getDepotId(depotItem:getUniqueId()), true):getItemHoldingCount()
+			local depotItems = 0
+			
+			for i = 1, 17 do
+					depotItems = depotItems + player:getDepotChest(i, true):getItemHoldingCount()
+			end
+		
 			creature:sendTextMessage(MESSAGE_STATUS_DEFAULT, "Your depot contains " .. depotItems .. " item" .. (depotItems > 1 and "s." or "."))
 			return true
 		end

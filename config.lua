@@ -14,12 +14,13 @@ experienceByKillingPlayers = false
 expFromPlayersLevelRange = 75
 
 -- Connection Config
--- NOTE: maxPlayers set to 0 means no limit
+-- NOTE: maxPlayers and liveCastMaxSPectators set to 0 means no limit
 ip = "127.0.0.1"
 bindOnlyGlobalAddress = false
 loginProtocolPort = 7171
 gameProtocolPort = 7172
 statusProtocolPort = 7171
+liveCastProtocolPort = 7173
 maxPlayers = 0
 motd = "Welcome to The Forgotten Server!"
 onePlayerOnlinePerAccount = true
@@ -28,6 +29,12 @@ serverName = "Forgotten"
 statusTimeout = 5000
 replaceKickOnLogin = true
 maxPacketsPerSecond = 25
+liveCastEnabled = true
+liveCastMaxSpectators = 0
+
+-- Store configuration
+storeImagesUrl = "http://otserv.info/images/store/"
+storeCoinsPacketSize = 25
 
 -- Deaths
 -- NOTE: Leave deathLosePercent as -1 if you want to use the default

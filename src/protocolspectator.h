@@ -1,6 +1,6 @@
 /**
  * The Forgotten Server - a free and open-source MMORPG server emulator
- * Copyright (C) 2017  Mark Samman <mark.samman@gmail.com>
+ * Copyright (C) 2016  Mark Samman <mark.samman@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,13 +17,10 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#ifndef FS_PROTOCOLGAME_H_FACA2A2D1A9348B78E8FD7E8003EBB87
-#define FS_PROTOCOLGAME_H_FACA2A2D1A9348B78E8FD7E8003EBB87
+#ifndef FS_PROTOCOSPECTATOR_H_D3CA2A5D1AC348D7FE8F37E40036BA80
+#define FS_PROTOCOSPECTATOR_H_D3CA2A5D1AC348D7FE8F37E40036BA80
 
-#include "protocol.h"
-#include "chat.h"
-#include "creature.h"
-#include "tasks.h"
+#include "protocolgame.h"
 
 class NetworkMessage;
 class Player;
@@ -33,28 +30,12 @@ class Container;
 class Tile;
 class Connection;
 class Quest;
-class ProtocolGame;
-class StoreCategory;
-using ProtocolGame_ptr = std::shared_ptr<ProtocolGame>;
+class ProtocolSpectator;
+typedef std::shared_ptr<ProtocolSpectator> ProtocolSpectator_ptr;
 
 extern Game g_game;
 
-struct TextMessage
-{
-	MessageClasses type = MESSAGE_STATUS_DEFAULT;
-	std::string text;
-	Position position;
-	uint16_t channelId;
-	struct {
-		int32_t value = 0;
-		TextColor_t color;
-	} primary, secondary;
-
-	TextMessage() = default;
-	TextMessage(MessageClasses type, std::string text) : type(type), text(std::move(text)) {}
-};
-
-class ProtocolGame : public Protocol
+class ProtocolSpectator final : public ProtocolGame
 {
 	public:
 		// static protocol information
@@ -62,27 +43,28 @@ class ProtocolGame : public Protocol
 		enum {protocol_identifier = 0}; // Not required as we send first
 		enum {use_checksum = true};
 		static const char* protocol_name() {
-			return "gameworld protocol";
+			return "live caster protocol";
 		}
 
-		explicit ProtocolGame(Connection_ptr connection) : Protocol(connection) {}
+		explicit ProtocolSpectator(Connection_ptr connection) : ProtocolGame(connection) {}
 
 		void login(const std::string& name, uint32_t accnumber, OperatingSystem_t operatingSystem);
-		void logout(bool displayEffect, bool forced);
+		void logout(bool displayEffect = false, bool forced = false);
 
 		uint16_t getVersion() const {
 			return version;
 		}
 
 	private:
-		ProtocolGame_ptr getThis() {
-			return std::static_pointer_cast<ProtocolGame>(shared_from_this());
+		ProtocolSpectator_ptr getThis() {
+			return std::static_pointer_cast<ProtocolSpectator>(shared_from_this());
 		}
+		void syncOpenContainers();
 		void connect(uint32_t playerId, OperatingSystem_t operatingSystem);
 		void disconnectClient(const std::string& message) const;
-		void writeToOutputBuffer(const NetworkMessage& msg, bool broadcast = true);
+		void writeToOutputBuffer(const NetworkMessage& msg, bool broadcast = false);
 
-		void release();
+		void release() final;
 
 		void checkCreatureAsKnown(uint32_t id, bool& known, uint32_t& removedKnown);
 
@@ -91,9 +73,9 @@ class ProtocolGame : public Protocol
 		bool canSee(const Position& pos) const;
 
 		// we have all the parse methods
-		void parsePacket(NetworkMessage& msg);
-		void onRecvFirstMessage(NetworkMessage& msg);
-		void onConnect();
+		void parsePacket(NetworkMessage& msg) final;
+		void onRecvFirstMessage(NetworkMessage& msg) final;
+		void onConnect() final;
 
 		//Parse methods
 		void parseAutoWalk(NetworkMessage& msg);
@@ -105,7 +87,6 @@ class ProtocolGame : public Protocol
 		void parseFightModes(NetworkMessage& msg);
 		void parseAttack(NetworkMessage& msg);
 		void parseFollow(NetworkMessage& msg);
-		void parseEquipObject(NetworkMessage& msg);
 
 		void parseBugReport(NetworkMessage& msg);
 		void parseDebugAssert(NetworkMessage& msg);
@@ -150,14 +131,6 @@ class ProtocolGame : public Protocol
 		void parseMarketCancelOffer(NetworkMessage& msg);
 		void parseMarketAcceptOffer(NetworkMessage& msg);
 
-		//store methods
-		void parseStoreOpen();
-		void parseStoreSelectCategory(NetworkMessage& msg);
-		void parseStoreBuyOffer(NetworkMessage& msg);
-		void parseStoreOpenHistory(NetworkMessage& msg);
-		void parseStoreRequestHistory(NetworkMessage& msg);
-		void parseTransferCoins(NetworkMessage& msg);
-
 		//VIP methods
 		void parseAddVip(NetworkMessage& msg);
 		void parseRemoveVip(NetworkMessage& msg);
@@ -173,7 +146,7 @@ class ProtocolGame : public Protocol
 		void parseCloseChannel(NetworkMessage& msg);
 
 		//Send functions
-		void sendChannelMessage(const std::string& author, const std::string& text, SpeakClasses type, uint16_t channel, bool broadcast = true);
+		void sendChannelMessage(const std::string& author, const std::string& text, SpeakClasses type, uint16_t channel, bool broadcast = false);
 		void sendChannelEvent(uint16_t channelId, const std::string& playerName, ChannelEvent_t channelEvent);
 		void sendClosePrivate(uint16_t channelId);
 		void sendCreatePrivateChannel(uint16_t channelId, const std::string& channelName);
@@ -229,15 +202,6 @@ class ProtocolGame : public Protocol
 		void sendTradeItemRequest(const std::string& traderName, const Item* item, bool ack);
 		void sendCloseTrade();
 
-		void sendStore();
-		void requestPurchaseData(uint32_t offerId, StoreOfferType_t offerType);
-		void sendStoreOffers(StoreCategory& category);
-		void sendStoreError(StoreError_t errorType, const std::string& message);
-		void updateCoinBalance();
-		void sendCoinBalance();
-		void sendStorePurchaseCompleted(const std::string& message);
-		void sendStoreHistory(uint32_t page, uint32_t entriesPerPage);
-
 		void sendTextWindow(uint32_t windowTextId, Item* item, uint16_t maxlen, bool canWrite);
 		void sendTextWindow(uint32_t windowTextId, uint32_t itemId, const std::string& text);
 		void sendHouseWindow(uint32_t windowTextId, const std::string& text);
@@ -281,7 +245,6 @@ class ProtocolGame : public Protocol
 
 		//inventory
 		void sendInventoryItem(slots_t slot, const Item* item);
-		void sendItems();
 
 		//messages
 		void sendModalWindow(const ModalWindow& modalWindow);
@@ -319,7 +282,7 @@ class ProtocolGame : public Protocol
 		void parseExtendedOpcode(NetworkMessage& msg);
 
 		friend class Player;
-		friend class ProtocolSpectator;
+		friend class ProtocolGame;
 
 		// Helpers so we don't need to bind every time
 		template <typename Callable, typename... Args>
@@ -334,15 +297,13 @@ class ProtocolGame : public Protocol
 
 		std::unordered_set<uint32_t> knownCreatureSet;
 		Player* player = nullptr;
+		Player* spectator = nullptr;
 
 		uint32_t eventConnect = 0;
 		uint32_t challengeTimestamp = 0;
 		uint16_t version = CLIENT_VERSION_MIN;
 
 		uint8_t challengeRandom = 0;
-
-		uint8_t storeHistoryEntriesPerPage = 16;
-		uint32_t currentPage = 0;
 
 		bool debugAssertSent = false;
 		bool acceptPackets = false;
