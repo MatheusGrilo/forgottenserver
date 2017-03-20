@@ -586,6 +586,10 @@ MagicEffectNames magicEffectNames = {
 	{"yellowsmoke",		CONST_ME_YELLOWSMOKE},
 	{"greensmoke",		CONST_ME_GREENSMOKE},
 	{"purplesmoke",		CONST_ME_PURPLESMOKE},
+	{"earlythunder",		CONST_ME_EARLY_THUNDER },
+	{"ragiazbonecapsule",		CONST_ME_RAGIAZ_BONECAPSULE},
+	{"criticaldagame",		CONST_ME_CRITICAL_DAMAGE},
+	{"plugingfish",		CONST_ME_PLUNGING_FISH},
 };
 
 ShootTypeNames shootTypeNames = {
@@ -775,6 +779,24 @@ std::string getSkillName(uint8_t skillid)
 
 		case SKILL_FISHING:
 			return "fishing";
+
+		case SKILL_CRITICAL_HIT_CHANCE:
+			return "critical hit chance";
+
+		case SKILL_CRITICAL_HIT_DAMAGE:
+			return "critical hit damage";
+
+		case SKILL_LIFE_LEECH_CHANCE:
+			return "life leech chance";
+
+		case SKILL_LIFE_LEECH_AMOUNT:
+			return "life leech amount";
+
+		case SKILL_MANA_LEECH_CHANCE:
+			return "mana leech chance";
+
+		case SKILL_MANA_LEECH_AMOUNT:
+			return "mana leech amount";
 
 		case SKILL_MAGLEVEL:
 			return "magic level";
@@ -989,6 +1011,9 @@ std::string getFirstLine(const std::string& str)
 const char* getReturnMessage(ReturnValue value)
 {
 	switch (value) {
+		case RETURNVALUE_REWARDCHESTISEMPTY:
+			return "The chest is currently empty. You did not take part in any battles in the last seven days or already claimed your reward.";
+
 		case RETURNVALUE_DESTINATIONOUTOFREACH:
 			return "Destination is out of reach.";
 
@@ -1187,6 +1212,27 @@ const char* getReturnMessage(ReturnValue value)
 
 		case RETURNVALUE_YOUCANNOTTRADETHISHOUSE:
 			return "You can not trade this house.";
+
+		case RETURNVALUE_NOTENOUGHFISTLEVEL:
+			return "You do not have enough fist level";
+
+		case RETURNVALUE_NOTENOUGHCLUBLEVEL:
+			return "You do not have enough club level";
+
+		case RETURNVALUE_NOTENOUGHSWORDLEVEL:
+			return "You do not have enough sword level";
+
+		case RETURNVALUE_NOTENOUGHAXELEVEL:
+			return "You do not have enough axe level";
+
+		case RETURNVALUE_NOTENOUGHDISTANCELEVEL:
+			return "You do not have enough distance level";
+
+		case RETURNVALUE_NOTENOUGHSHIELDLEVEL:
+			return "You do not have enough shielding level";
+
+		case RETURNVALUE_NOTENOUGHFISHLEVEL:
+			return "You do not have enough fishing level";
 
 		default: // RETURNVALUE_NOTPOSSIBLE, etc
 			return "Sorry, not possible.";

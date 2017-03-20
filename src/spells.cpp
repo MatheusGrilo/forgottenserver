@@ -477,6 +477,34 @@ bool Spell::configureSpell(const pugi::xml_node& node)
 		range = pugi::cast<int32_t>(attr.value());
 	}
 
+	if ((attr = node.attribute("fist"))) {
+		fist = pugi::cast<uint32_t>(attr.value());
+	}
+
+	if ((attr = node.attribute("club"))) {
+		club = pugi::cast<uint32_t>(attr.value());
+	}
+
+	if ((attr = node.attribute("sword"))) {
+		sword = pugi::cast<uint32_t>(attr.value());
+	}
+
+	if ((attr = node.attribute("axe"))) {
+		axe = pugi::cast<uint32_t>(attr.value());
+	}
+
+	if ((attr = node.attribute("dist")) || (attr = node.attribute("distance"))) {
+		distance = pugi::cast<uint32_t>(attr.value());
+	}
+
+	if ((attr = node.attribute("shield"))) {
+		shield = pugi::cast<uint32_t>(attr.value());
+	}
+
+	if ((attr = node.attribute("fish"))) {
+		fish = pugi::cast<uint32_t>(attr.value());
+	}
+
 	if ((attr = node.attribute("exhaustion")) || (attr = node.attribute("cooldown"))) {
 		cooldown = pugi::cast<uint32_t>(attr.value());
 	}
@@ -597,6 +625,48 @@ bool Spell::playerSpellCheck(Player* player) const
 
 	if (player->getSoul() < soul && !player->hasFlag(PlayerFlag_HasInfiniteSoul)) {
 		player->sendCancelMessage(RETURNVALUE_NOTENOUGHSOUL);
+		g_game.addMagicEffect(player->getPosition(), CONST_ME_POFF);
+		return false;
+	}
+
+	if (player->getSkillLevel(SKILL_FIST) < fist) {
+		player->sendCancelMessage(RETURNVALUE_NOTENOUGHFISTLEVEL);
+		g_game.addMagicEffect(player->getPosition(), CONST_ME_POFF);
+		return false;
+	}
+
+	if (player->getSkillLevel(SKILL_CLUB) < club) {
+		player->sendCancelMessage(RETURNVALUE_NOTENOUGHCLUBLEVEL);
+		g_game.addMagicEffect(player->getPosition(), CONST_ME_POFF);
+		return false;
+	}
+
+	if (player->getSkillLevel(SKILL_SWORD) < sword) {
+		player->sendCancelMessage(RETURNVALUE_NOTENOUGHSWORDLEVEL);
+		g_game.addMagicEffect(player->getPosition(), CONST_ME_POFF);
+		return false;
+	}
+
+	if (player->getSkillLevel(SKILL_AXE) < axe) {
+		player->sendCancelMessage(RETURNVALUE_NOTENOUGHAXELEVEL);
+		g_game.addMagicEffect(player->getPosition(), CONST_ME_POFF);
+		return false;
+	}
+
+	if (player->getSkillLevel(SKILL_DISTANCE) < distance) {
+		player->sendCancelMessage(RETURNVALUE_NOTENOUGHDISTANCELEVEL);
+		g_game.addMagicEffect(player->getPosition(), CONST_ME_POFF);
+		return false;
+	}
+
+	if (player->getSkillLevel(SKILL_SHIELD) < shield) {
+		player->sendCancelMessage(RETURNVALUE_NOTENOUGHSHIELDLEVEL);
+		g_game.addMagicEffect(player->getPosition(), CONST_ME_POFF);
+		return false;
+	}
+
+	if (player->getSkillLevel(SKILL_FISHING) < fish) {
+		player->sendCancelMessage(RETURNVALUE_NOTENOUGHFISHLEVEL);
 		g_game.addMagicEffect(player->getPosition(), CONST_ME_POFF);
 		return false;
 	}
@@ -884,68 +954,6 @@ bool InstantSpell::configureEvent(const pugi::xml_node& node)
 	return true;
 }
 
-namespace {
-
-bool Levitate(const InstantSpell*, Creature* creature, const std::string& param)
-{
-	Player* player = creature->getPlayer();
-	if (!player) {
-		return false;
-	}
-
-	const Position& currentPos = creature->getPosition();
-	const Position& destPos = Spells::getCasterPosition(creature, creature->getDirection());
-
-	ReturnValue ret = RETURNVALUE_NOTPOSSIBLE;
-
-	if (strcasecmp(param.c_str(), "up") == 0) {
-		if (currentPos.z != 8) {
-			Tile* tmpTile = g_game.map.getTile(currentPos.x, currentPos.y, currentPos.getZ() - 1);
-			if (tmpTile == nullptr || (tmpTile->getGround() == nullptr && !tmpTile->hasFlag(TILESTATE_IMMOVABLEBLOCKSOLID))) {
-				tmpTile = g_game.map.getTile(destPos.x, destPos.y, destPos.getZ() - 1);
-				if (tmpTile && tmpTile->getGround() && !tmpTile->hasFlag(TILESTATE_IMMOVABLEBLOCKSOLID | TILESTATE_FLOORCHANGE)) {
-					ret = g_game.internalMoveCreature(*player, *tmpTile, FLAG_IGNOREBLOCKITEM | FLAG_IGNOREBLOCKCREATURE);
-				}
-			}
-		}
-	} else if (strcasecmp(param.c_str(), "down") == 0) {
-		if (currentPos.z != 7) {
-			Tile* tmpTile = g_game.map.getTile(destPos);
-			if (tmpTile == nullptr || (tmpTile->getGround() == nullptr && !tmpTile->hasFlag(TILESTATE_BLOCKSOLID))) {
-				tmpTile = g_game.map.getTile(destPos.x, destPos.y, destPos.z + 1);
-				if (tmpTile && tmpTile->getGround() && !tmpTile->hasFlag(TILESTATE_IMMOVABLEBLOCKSOLID | TILESTATE_FLOORCHANGE)) {
-					ret = g_game.internalMoveCreature(*player, *tmpTile, FLAG_IGNOREBLOCKITEM | FLAG_IGNOREBLOCKCREATURE);
-				}
-			}
-		}
-	}
-
-	if (ret != RETURNVALUE_NOERROR) {
-		player->sendCancelMessage(ret);
-		g_game.addMagicEffect(player->getPosition(), CONST_ME_POFF);
-		return false;
-	}
-
-	g_game.addMagicEffect(player->getPosition(), CONST_ME_TELEPORT);
-	return true;
-}
-
-}
-
-bool InstantSpell::loadFunction(const pugi::xml_attribute& attr)
-{
-	const char* functionName = attr.as_string();
-	if (strcasecmp(functionName, "levitate") == 0) {
-		function = Levitate;
-	} else {
-		std::cout << "[Warning - InstantSpell::loadFunction] Function \"" << functionName << "\" does not exist." << std::endl;
-		return false;
-	}
-
-	scripted = false;
-	return true;
-}
-
 bool InstantSpell::playerCastInstant(Player* player, std::string& param)
 {
 	if (!playerSpellCheck(player)) {
@@ -1138,13 +1146,7 @@ bool InstantSpell::castSpell(Creature* creature, Creature* target)
 
 bool InstantSpell::internalCastSpell(Creature* creature, const LuaVariant& var)
 {
-	if (scripted) {
-		return executeCastSpell(creature, var);
-	} else if (function) {
-		return function(this, creature, var.text);
-	}
-
-	return false;
+	return executeCastSpell(creature, var);
 }
 
 bool InstantSpell::executeCastSpell(Creature* creature, const LuaVariant& var)

@@ -23,7 +23,12 @@
 #include "tools.h"
 
 DepotChest::DepotChest(uint16_t type) :
-	Container(type), maxDepotItems(1500) {}
+	Container(type)
+{
+	maxDepotItems = 2000;
+	maxSize = 32;
+	pagination = true;
+}
 
 ReturnValue DepotChest::queryAdd(int32_t index, const Thing& thing, uint32_t count,
 		uint32_t flags, Creature* actor/* = nullptr*/) const
@@ -49,7 +54,12 @@ ReturnValue DepotChest::queryAdd(int32_t index, const Thing& thing, uint32_t cou
 			}
 		}
 
-		if (getItemHoldingCount() + addCount > maxDepotItems) {
+		if (Cylinder* parent = getRealParent()) {
+			if (parent->getContainer()->getItemHoldingCount() + addCount > maxDepotItems) {
+				return RETURNVALUE_DEPOTISFULL;
+			}
+		}
+		else if (getItemHoldingCount() + addCount > maxDepotItems) {
 			return RETURNVALUE_DEPOTISFULL;
 		}
 	}
@@ -75,8 +85,8 @@ void DepotChest::postRemoveNotification(Thing* thing, const Cylinder* newParent,
 
 Cylinder* DepotChest::getParent() const
 {
-	if (parent) {
-		return parent->getParent();
+	if (parent && parent->getParent()) {
+		return parent->getParent()->getParent();
 	}
 	return nullptr;
 }

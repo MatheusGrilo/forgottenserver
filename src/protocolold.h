@@ -23,6 +23,7 @@
 #include "protocol.h"
 
 class NetworkMessage;
+class OutputMessage;
 
 class ProtocolOld final : public Protocol
 {

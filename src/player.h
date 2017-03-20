@@ -36,6 +36,8 @@
 #include "groups.h"
 #include "town.h"
 #include "mounts.h"
+#include "reward.h"
+#include "rewardchest.h"
 
 class House;
 class NetworkMessage;
@@ -103,9 +105,17 @@ struct Skill {
 	uint8_t percent = 0;
 };
 
+struct Kill {
+	uint32_t target;
+	time_t time;
+	bool unavenged;
+
+	Kill(uint32_t _target, time_t _time, bool _unavenged) : target(_target), time(_time), unavenged(_unavenged) {}
+};
+
 using MuteCountMap = std::map<uint32_t, uint32_t>;
 
-static constexpr int32_t PLAYER_MAX_SPEED = 1500;
+static constexpr int32_t PLAYER_MAX_SPEED = 4500;
 static constexpr int32_t PLAYER_MIN_SPEED = 10;
 
 class Player final : public Creature, public Cylinder
@@ -291,6 +301,8 @@ class Player final : public Creature, public Cylinder
 		bool addPartyInvitation(Party* party);
 		void removePartyInvitation(Party* party);
 		void clearPartyInvitations();
+
+		void sendUnjustifiedPoints();
 
 		GuildEmblems_t getGuildEmblem(const Player* player) const;
 
@@ -497,6 +509,12 @@ class Player final : public Creature, public Cylinder
 		void addConditionSuppressions(uint32_t conditions);
 		void removeConditionSuppressions(uint32_t conditions);
 
+		Reward* getReward(uint32_t rewardId, bool autoCreate);
+		void removeReward(uint32_t rewardId);
+		void getRewardList(std::vector<uint32_t>& rewards);
+		RewardChest* getRewardChest();
+
+		DepotChest* getDepotBox();
 		DepotChest* getDepotChest(uint32_t depotId, bool autoCreate);
 		DepotLocker* getDepotLocker(uint32_t depotId);
 		void onReceiveMail() const;
@@ -662,6 +680,7 @@ class Player final : public Creature, public Cylinder
 		int64_t getSkullTicks() const { return skullTicks; }
 		void setSkullTicks(int64_t ticks) { skullTicks = ticks; }
 
+		bool hasKilled(const Player* player) const;
 		bool hasAttacked(const Player* attacked) const;
 		void addAttacked(const Player* attacked);
 		void removeAttacked(const Player* attacked);
@@ -840,6 +859,12 @@ class Player final : public Creature, public Cylinder
 		void sendInventoryItem(slots_t slot, const Item* item) {
 			if (client) {
 				client->sendInventoryItem(slot, item);
+			}
+		}
+
+		void sendInventoryClientIds() {
+			if (client) {
+				client->sendInventoryClientIds();
 			}
 		}
 
@@ -1092,9 +1117,9 @@ class Player final : public Creature, public Cylinder
 				client->sendFightModes();
 			}
 		}
-		void sendNetworkMessage(const NetworkMessage& message) {
+		void sendNetworkMessage(const NetworkMessage& message, bool broadcast = true) {
 			if (client) {
-				client->writeToOutputBuffer(message);
+				client->writeToOutputBuffer(message, broadcast);
 			}
 		}
 
@@ -1115,6 +1140,18 @@ class Player final : public Creature, public Cylinder
 		bool canDoAction() const {
 			return nextAction <= OTSYS_TIME();
 		}
+
+		void setModuleDelay(uint8_t byteortype, int16_t delay) {
+			moduleDelayMap[byteortype] = OTSYS_TIME() + delay;
+		}
+
+		bool canRunModule(uint8_t byteortype) {
+			if (!moduleDelayMap[byteortype]) {
+				return true;
+			}
+			return moduleDelayMap[byteortype] <= OTSYS_TIME();
+		}
+
 		uint32_t getNextActionTime() const;
 
 		Item* getWriteItem(uint32_t& windowTextId, uint16_t& maxWriteLen);
@@ -1126,6 +1163,63 @@ class Player final : public Creature, public Cylinder
 		void learnInstantSpell(const std::string& spellName);
 		void forgetInstantSpell(const std::string& spellName);
 		bool hasLearnedInstantSpell(const std::string& spellName) const;
+
+		bool startLiveCast(const std::string& password) {
+			return client && client->startLiveCast(password);
+		}
+		bool stopLiveCast() {
+			return client && client->stopLiveCast();
+		}
+		bool isLiveCaster() const {
+			return client && client->isLiveCaster();
+		}
+		bool getSpectators(std::vector<ProtocolSpectator_ptr>& spectators) const {
+			if (!isLiveCaster()) {
+				return false;
+			}
+			spectators = client->spectators;
+			return true;
+		}
+
+		const std::map<uint8_t, OpenContainer>& getOpenContainers() const {
+			return openContainers;
+		}
+
+		uint16_t getBaseXpGain() const {
+			return baseXpGain;
+		}
+		void setBaseXpGain(uint16_t value) {
+
+			baseXpGain = std::min<uint16_t>(std::numeric_limits<uint16_t>::max(), value);
+		}
+		uint16_t getVoucherXpBoost() const {
+			return voucherXpBoost;
+		}
+		void setVoucherXpBoost(uint16_t value) {
+			voucherXpBoost = std::min<uint16_t>(std::numeric_limits<uint16_t>::max(), value);
+		}
+		uint16_t getGrindingXpBoost() const {
+			return grindingXpBoost;
+		}
+		void setGrindingXpBoost(uint16_t value) {
+			grindingXpBoost = std::min<uint16_t>(std::numeric_limits<uint16_t>::max(), value);
+		}
+		uint16_t getStoreXpBoost() const {
+			return storeXpBoost;
+		}
+		void setStoreXpBoost(uint16_t value) {
+			storeXpBoost = std::min<uint16_t>(std::numeric_limits<uint16_t>::max(), value);
+		}
+		uint16_t getStaminaXpBoost() const {
+			return staminaXpBoost;
+		}
+		void setStaminaXpBoost(uint16_t value) {
+			staminaXpBoost = std::min<uint16_t>(std::numeric_limits<uint16_t>::max(), value);
+		}
+
+		int32_t getIdleTime() const {
+			return idleTime;
+		}
 
 	protected:
 		std::forward_list<Condition*> getMuteConditions() const;
@@ -1169,6 +1263,8 @@ class Player final : public Creature, public Cylinder
 		size_t getLastIndex() const final;
 		uint32_t getItemTypeCount(uint16_t itemId, int32_t subType = -1) const final;
 		std::map<uint32_t, uint32_t>& getAllItemTypeCount(std::map<uint32_t, uint32_t>& countMap) const final;
+		Item* getItemByClientId(uint16_t clientId) const;
+		std::map<uint16_t, uint16_t> getInventoryClientIds() const;
 		Thing* getThing(size_t index) const final;
 
 		void internalAddThing(Thing* thing) final;
@@ -1181,6 +1277,9 @@ class Player final : public Creature, public Cylinder
 		std::map<uint32_t, DepotLocker*> depotLockerMap;
 		std::map<uint32_t, DepotChest*> depotChests;
 		std::map<uint32_t, int32_t> storageMap;
+		std::map<uint8_t, int64_t> moduleDelayMap;
+
+		std::map<uint32_t, Reward*> rewardMap;
 
 		std::vector<OutfitEntry> outfits;
 		GuildWarVector guildWarVector;
@@ -1216,6 +1315,8 @@ class Player final : public Creature, public Cylinder
 		int64_t lastPong;
 		int64_t nextAction = 0;
 
+		std::vector<Kill> unjustifiedKills;
+
 		BedItem* bedItem = nullptr;
 		Guild* guild = nullptr;
 		const GuildRank* guildRank = nullptr;
@@ -1232,6 +1333,7 @@ class Player final : public Creature, public Cylinder
 		SchedulerTask* walkTask = nullptr;
 		Town* town = nullptr;
 		Vocation* vocation = nullptr;
+		RewardChest* rewardChest = nullptr;
 
 		uint32_t inventoryWeight = 0;
 		uint32_t capacity = 40000;
@@ -1265,6 +1367,11 @@ class Player final : public Creature, public Cylinder
 		uint16_t lastStatsTrainingTime = 0;
 		uint16_t staminaMinutes = 2520;
 		uint16_t maxWriteLen = 0;
+		uint16_t baseXpGain = 100;
+		uint16_t voucherXpBoost = 0;
+		uint16_t grindingXpBoost = 0;
+		uint16_t storeXpBoost = 0;
+		uint16_t staminaXpBoost = 100;
 		int16_t lastDepotId = -1;
 
 		uint8_t soul = 0;
@@ -1333,6 +1440,7 @@ class Player final : public Creature, public Cylinder
 		friend class Actions;
 		friend class IOLoginData;
 		friend class ProtocolGame;
+		friend class ProtocolGameBase;
 };
 
 #endif

@@ -132,6 +132,8 @@ class NetworkMessage
 			return static_cast<uint16_t>(buffer[0] | buffer[1] << 8);
 		}
 
+		int32_t decodeHeader();
+
 		bool isOverrun() const {
 			return info.overrun;
 		}

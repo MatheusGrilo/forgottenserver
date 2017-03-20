@@ -23,6 +23,7 @@
 #include "connection.h"
 #include "outputmessage.h"
 #include "protocol.h"
+#include "protocolgame.h"
 #include "scheduler.h"
 #include "server.h"
 
@@ -134,29 +135,23 @@ void Connection::parseHeader(const boost::system::error_code& error)
 	std::lock_guard<std::recursive_mutex> lockClass(connectionLock);
 	readTimer.cancel();
 
-	if (error) {
+	int32_t size = msg.decodeHeader();
+	if (error || size <= 0 || size >= NETWORKMESSAGE_MAXSIZE - 16) {
 		close(FORCE_CLOSE);
-		return;
-	} else if (connectionState != CONNECTION_STATE_OPEN) {
+	}
+
+	if (connectionState != CONNECTION_STATE_OPEN) {
 		return;
 	}
 
 	uint32_t timePassed = std::max<uint32_t>(1, (time(nullptr) - timeConnected) + 1);
 	if ((++packetsSent / timePassed) > static_cast<uint32_t>(g_config.getNumber(ConfigManager::MAX_PACKETS_PER_SECOND))) {
-		std::cout << convertIPToString(getIP()) << " disconnected for exceeding packet per second limit." << std::endl;
-		close();
 		return;
 	}
 
 	if (timePassed > 2) {
 		timeConnected = time(nullptr);
 		packetsSent = 0;
-	}
-
-	uint16_t size = msg.getLengthHeader();
-	if (size == 0 || size >= NETWORKMESSAGE_MAXSIZE - 16) {
-		close(FORCE_CLOSE);
-		return;
 	}
 
 	try {
@@ -181,8 +176,9 @@ void Connection::parsePacket(const boost::system::error_code& error)
 
 	if (error) {
 		close(FORCE_CLOSE);
-		return;
-	} else if (connectionState != CONNECTION_STATE_OPEN) {
+	}
+
+	if (connectionState != CONNECTION_STATE_OPEN) {
 		return;
 	}
 
@@ -252,6 +248,10 @@ void Connection::send(const OutputMessage_ptr& msg)
 
 void Connection::internalSend(const OutputMessage_ptr& msg)
 {
+	if (msg->isBroadcastMsg()) {
+		dispatchBroadcastMessage(msg);
+	}
+
 	protocol->onSendMessage(msg);
 	try {
 		writeTimer.expires_from_now(boost::posix_time::seconds(Connection::write_timeout));
@@ -279,6 +279,29 @@ uint32_t Connection::getIP()
 	}
 
 	return htonl(endpoint.address().to_v4().to_ulong());
+}
+
+void Connection::dispatchBroadcastMessage(const OutputMessage_ptr& msg)
+{
+	auto msgCopy = OutputMessagePool::getOutputMessage();
+	msgCopy->append(msg);
+	socket.get_io_service().dispatch(std::bind(&Connection::broadcastMessage, shared_from_this(), msgCopy));
+}
+
+void Connection::broadcastMessage(OutputMessage_ptr msg)
+{
+	std::lock_guard<std::recursive_mutex> lockClass(connectionLock);
+	const auto client = std::dynamic_pointer_cast<ProtocolGame>(protocol);
+	if (client) {
+		std::lock_guard<decltype(client->liveCastLock)> lockGuard(client->liveCastLock);
+
+		const auto& spectators = client->getLiveCastSpectators();
+		for (const ProtocolSpectator_ptr& spectator : spectators) {
+			auto newMsg = OutputMessagePool::getOutputMessage();
+			newMsg->append(msg);
+			spectator->send(std::move(newMsg));
+		}
+	}
 }
 
 void Connection::onWriteOperation(const boost::system::error_code& error)

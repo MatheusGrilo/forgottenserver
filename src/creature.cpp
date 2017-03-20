@@ -42,7 +42,7 @@ Creature::~Creature()
 {
 	for (Creature* summon : summons) {
 		summon->setAttackedCreature(nullptr);
-		summon->setMaster(nullptr);
+		summon->removeMaster();
 	}
 
 	for (Condition* condition : conditions) {
@@ -1081,6 +1081,14 @@ void Creature::onAttackedCreatureDrainHealth(Creature* target, int32_t points)
 	target->addDamagePoints(this, points);
 }
 
+void Creature::onAttackedCreatureKilled(Creature* target)
+{
+	if (target != this) {
+		uint64_t gainExp = target->getGainedExperience(this);
+		onGainExperience(gainExp, target);
+	}
+}
+
 bool Creature::onKilledCreature(Creature* target, bool)
 {
 	if (master) {
@@ -1130,15 +1138,16 @@ bool Creature::setMaster(Creature* newMaster) {
 		newMaster->summons.push_back(this);
 	}
 
-	if (master) {
-		auto summon = std::find(master->summons.begin(), master->summons.end(), this);
-		if (summon != master->summons.end()) {
+	Creature* oldMaster = master;
+	master = newMaster;
+
+	if (oldMaster) {
+		auto summon = std::find(oldMaster->summons.begin(), oldMaster->summons.end(), this);
+		if (summon != oldMaster->summons.end()) {
+			oldMaster->summons.erase(summon);
 			decrementReferenceCounter();
-			master->summons.erase(summon);
 		}
 	}
-
-	master = newMaster;
 	return true;
 }
 

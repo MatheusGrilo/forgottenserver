@@ -44,8 +44,10 @@ enum slots_t : uint8_t {
 	CONST_SLOT_RING = 9,
 	CONST_SLOT_AMMO = 10,
 
+	CONST_SLOT_STORE_INBOX = 11,
+
 	CONST_SLOT_FIRST = CONST_SLOT_HEAD,
-	CONST_SLOT_LAST = CONST_SLOT_AMMO,
+	CONST_SLOT_LAST = CONST_SLOT_STORE_INBOX,
 };
 
 struct FindPathParams {
@@ -172,6 +174,13 @@ class Creature : virtual public Thing
 			hiddenHealth = b;
 		}
 
+		bool isMoveLocked() const {
+			return moveLocked;
+		}
+		void setMoveLocked(bool locked) {
+			moveLocked = locked;
+		}
+
 		int32_t getThrowRange() const final {
 			return 1;
 		}
@@ -278,6 +287,13 @@ class Creature : virtual public Thing
 
 		bool setMaster(Creature* newMaster);
 
+		void removeMaster() {
+			if (master) {
+				master = nullptr;
+				decrementReferenceCounter();
+			}
+		}
+
 		bool isSummon() const {
 			return master != nullptr;
 		}
@@ -361,6 +377,7 @@ class Creature : virtual public Thing
 		virtual void onAttacked();
 		virtual void onAttackedCreatureDrainHealth(Creature* target, int32_t points);
 		virtual void onTargetCreatureGainHealth(Creature*, int32_t) {}
+		void onAttackedCreatureKilled(Creature* target);
 		virtual bool onKilledCreature(Creature* target, bool lastHit = true);
 		virtual void onGainExperience(uint64_t gainExp, Creature* target);
 		virtual void onAttackedCreatureBlockHit(BlockType_t) {}
@@ -529,6 +546,7 @@ class Creature : virtual public Thing
 		bool hasFollowPath = false;
 		bool forceUpdateFollowPath = false;
 		bool hiddenHealth = false;
+		bool moveLocked = false;
 
 		//creature script events
 		bool hasEventRegistered(CreatureEventType_t event) const {

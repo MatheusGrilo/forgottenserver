@@ -400,7 +400,7 @@ class Game
 
 		void parsePlayerExtendedOpcode(uint32_t playerId, uint8_t opcode, const std::string& buffer);
 
-		std::forward_list<Item*> getMarketItemList(uint16_t wareId, uint16_t sufficientCount, DepotChest* depotChest, Inbox* inbox);
+		std::forward_list<Item*> getMarketItemList(uint16_t wareId, uint16_t sufficientCount, DepotLocker* depotLocker);
 
 		static void updatePremium(Account& account);
 
@@ -495,6 +495,9 @@ class Game
 		void removeUniqueItem(uint16_t uniqueId);
 
 		bool reload(ReloadTypes_t reloadType);
+
+		bool hasEffect(uint8_t effectId);
+		bool hasDistanceEffect(uint8_t effectId);
 
 		Groups groups;
 		Map map;
